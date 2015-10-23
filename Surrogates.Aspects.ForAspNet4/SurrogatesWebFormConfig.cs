@@ -1,4 +1,5 @@
-﻿using Surrogates.Expressions;
+﻿using Surrogates.Aspects.ForAspNet4.Expressions;
+using Surrogates.Expressions;
 using System;
 using System.Collections.Generic;
 using System.Linq;
@@ -9,7 +10,7 @@ namespace Surrogates.Aspects.ForAspNet4
 {
     public static class SurrogatesWebFormConfig
     {
-        public static void Map(Action<NewExpression> map)
+        public static void Map(Action<WebFormExpression> map)
         {
             SurrogatedWebFormFactory.Container.Map(map);
         }

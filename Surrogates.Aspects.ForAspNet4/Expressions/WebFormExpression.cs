@@ -11,6 +11,7 @@ using System.Linq;
 using System.Reflection.Emit;
 using System.Text;
 using System.Threading.Tasks;
+using System.Web;
 
 namespace Surrogates.Aspects.ForAspNet4.Expressions
 {
@@ -18,6 +19,8 @@ namespace Surrogates.Aspects.ForAspNet4.Expressions
     {
         private WebFormContainer _container;
         private WebFormStrategies _strats;
+
+
         internal new WebFormStrategies Strategies 
         { 
             get { return _strats ?? (_strats = this.ThosePlans as WebFormStrategies); } 
@@ -29,8 +32,9 @@ namespace Surrogates.Aspects.ForAspNet4.Expressions
             _container = (WebFormContainer) container;
         }
 
-        public override ExpressionFactory<T> From<T>(string path = "", Access? access = null, Access? excludeAccess = null)
-        {
+
+        public ExpressionFactory<T> From<T>(string path = "", Access? access = null, Access? excludeAccess = null, Func<HttpContext, bool> before = null, Func<HttpContext, T, bool> after = null)
+        {            
             if (string.IsNullOrEmpty(path))
             { throw new MissingRelativePathException(); }
 
@@ -45,13 +49,44 @@ namespace Surrogates.Aspects.ForAspNet4.Expressions
                 permissions &= ~excludeAccess.Value;
             }
 
-            ThosePlans = new WebFormStrategies(
-                typeof(T), path, ModuleBuilder, permissions);
+            var a = after != null ? 
+                (app, page) => after(app, (T) page) : 
+                (Func<HttpContext, object, bool>) null;
 
+            ThosePlans = ThosePlans ?? new WebFormStrategies(
+                typeof(T), path, ModuleBuilder, permissions, before, a);
+            
             return new ExpressionFactory<T>(
                 Container,
                 new Strategy(ThosePlans),
                 ThosePlans);
+        }
+
+        public ExpressionFactory<T> From<T>(string path = "", Access? access = null, Access? excludeAccess = null, Action<HttpContext> before = null, Action<HttpContext, T> after = null)
+        {
+            var b = before != null ? 
+                app => 
+                {
+                    before(app); 
+                    return true; 
+                } : 
+                (Func<HttpContext, bool>) null;
+            
+            var a = after != null ? 
+                (app, page) => 
+                {
+                    after(app, page); 
+                    return true; 
+                } : 
+                (Func<HttpContext, T, bool>) null;                
+
+            return From<T>(
+                path, access, excludeAccess, b, a);
+        }
+
+        public override ExpressionFactory<T> From<T>(string path = "", Access? access = null, Access? excludeAccess = null)
+        {
+            return From<T>(path, access, excludeAccess, (Func<HttpContext, bool>)null, (Func<HttpContext, T, bool>) null);
         }
     }
 }

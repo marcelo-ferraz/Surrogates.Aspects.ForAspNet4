@@ -1,4 +1,5 @@
 ﻿using Surrogates.Aspects.ForAspNet4.Container;
+using Surrogates.Aspects.ForAspNet4.Container.Cache;
 using Surrogates.Aspects.ForAspNet4.Exceptions;
 using Surrogates.Expressions;
 using Surrogates.Model.Entities;
@@ -30,8 +31,9 @@ namespace Surrogates.Aspects.ForAspNet4
             if (!Container.Has(type: typeof(Page), key: virtualPath.ToLower()))
             { return base.GetHandler(context, requestType, virtualPath, path); }
 
-            var page = Container.InvokeHandler(virtualPath, 
-                firstCall: (entry) => {
+            Action<WebFormEntry> firstCall = 
+                (entry) =>
+                {
                     var handler = base
                         .GetHandler(context, requestType, virtualPath, path) as Page;
 
@@ -40,15 +42,14 @@ namespace Surrogates.Aspects.ForAspNet4
 
                     entry.AppRelativeVirtualPath = handler.AppRelativeVirtualPath;
                     entry.AppRelativeTemplateSourceDirectory = handler.AppRelativeTemplateSourceDirectory;
-                });
-            
-            //page.TemplateControlVirtualPath = virtualPath;
-            
-            return page;
+                };
+
+            return Container.InvokeHandler(virtualPath,
+                firstCall: firstCall,
+                beforeInstatiate: (before) => before(context),
+                afterInstatiate: (after, obj) => after(context, obj));            
         }
 
-        public override void ReleaseHandler(IHttpHandler handler)
-        {            
-        }
+        public override void ReleaseHandler(IHttpHandler handler) { }
     }
 }

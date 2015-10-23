@@ -9,6 +9,7 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Text;
 using System.Threading.Tasks;
+using System.Web;
 using System.Web.UI;
 
 namespace Surrogates.Aspects.ForAspNet4.Container
@@ -23,6 +24,12 @@ namespace Surrogates.Aspects.ForAspNet4.Container
                Access.Container | Access.StateBag | Access.AnyMethod | Access.AnyField | Access.AnyBaseProperty | Access.AnyNewProperty | Access.Instance;
         }
 
+        public WebFormContainer Map(Action<WebFormExpression> map)
+        {
+            InternalMap(e => map((WebFormExpression)e));
+            return this;
+        }
+
         protected override void InternalMap(Action<NewExpression> mapping)
         {
             var expression =
@@ -32,8 +39,7 @@ namespace Surrogates.Aspects.ForAspNet4.Container
 
             var entry =
                 expression.Strategies.Apply();
-
-            // Cache.Add(entry.Type.Name, entry);
+                        
             Cache.Add(expression.Strategies.Path.ToLower(), entry);            
         }
 
@@ -45,9 +51,10 @@ namespace Surrogates.Aspects.ForAspNet4.Container
             return Cache.ContainsKey(key);
         }
 
-        public Page InvokeHandler(string path, Action<WebFormEntry> firstCall, Action<dynamic> stateBag = null)
+        public Page InvokeHandler(string path, Action<WebFormEntry> firstCall, Func<Func<HttpContext, bool>, bool> beforeInstatiate, Func<Func<HttpContext, object, bool>, object, bool> afterInstatiate, Action<dynamic> stateBag = null)
         {
-            var entry = Cache[path.ToLower()] as WebFormEntry;
+            var entry = 
+                Cache[path.ToLower()] as WebFormEntry;
 
             if (string.IsNullOrEmpty(entry.AppRelativeVirtualPath))
             {
@@ -56,6 +63,11 @@ namespace Surrogates.Aspects.ForAspNet4.Container
 
                 firstCall(entry);
             }
+
+            if (beforeInstatiate != null && 
+                entry.BeforeInstantiate != null && 
+                !beforeInstatiate(entry.BeforeInstantiate)) 
+            { return null; }
 
             var page = Activator
                 .CreateInstance(entry.Type, null) as Page;
@@ -79,7 +91,13 @@ namespace Surrogates.Aspects.ForAspNet4.Container
 
             page.AppRelativeTemplateSourceDirectory =
                 entry.AppRelativeTemplateSourceDirectory;
-            //this.Save();
+
+            if (afterInstatiate != null &&
+                entry.AfterInstantiate != null &&
+                !afterInstatiate(entry.AfterInstantiate, page))
+            { return null; }
+
+
             return page;
         }
     }
